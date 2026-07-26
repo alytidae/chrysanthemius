@@ -1,0 +1,13 @@
+[project]
+name = "chrysanthemius"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "dotenv>=0.9.9",
+    "openai>=2.48.0",
+    "peewee>=4.2.6",
+    "pydantic-ai>=2.18.0",
+    "pytelegrambotapi>=4.36.0",
+]
