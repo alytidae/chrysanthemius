@@ -10,21 +10,58 @@ class BaseModel(Model):
     class Meta:
         database = db
 
-class Transaction(BaseModel):
-    amount = DecimalField()
+class Currency(BaseModel):
+    code = CharField(unique=True, max_length=10)
+
+class Category(BaseModel):
+    name = CharField(unique=True)
+
+class Message(BaseModel):
+    role = CharField(
+        max_length=9,
+        constraints=[
+            Check("role IN ('user', 'assistant')")
+        ],
+    )
+    content = TextField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+
+class Fact(BaseModel):
+    content = TextField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+ 
+class Account(BaseModel):
+    name = CharField()
+    description = TextField(null=True)
+
+class PlannedPayment(BaseModel):
     description = TextField()
-    timestamp = DateTimeField(default=datetime.datetime.now)
+    amount = DecimalField(
+        max_digits=36,
+        decimal_places=18,
+        auto_round=False,
+    )
+    currency = ForeignKeyField(Currency)
+    due_at = DateTimeField(null=True)
+    recurrence = CharField(null=True)
+    is_active = BooleanField(default=True)
 
-    @classmethod
-    def get_all_transaction_sum(cls):
-        return cls.select(fn.SUM(cls.amount)).scalar()
-
-
+class Transaction(BaseModel):
+    account = ForeignKeyField(Account)
+    amount = DecimalField(
+        max_digits=36,
+        decimal_places=18,
+        auto_round=False,
+    )
+    currency = ForeignKeyField(Currency)
+    transaction_type = CharField()
+    category = ForeignKeyField(Category, null=True)
+    description = TextField(null=True)
+    occurred_at = DateTimeField()
+    created_at = DateTimeField(default=datetime.datetime.now)
 
 def init_db():
     db.connect()
     logger.info("Connected to db")
     db.create_tables([Transaction])
     logger.info("Updated db tables")
-
-
