@@ -3,7 +3,7 @@ import datetime
 from pydantic_ai import Agent, DeferredToolRequests
 from peewee import IntegrityError
 
-from models import Transaction, Account, Currency, Category, Fact, PlannedPayment
+from models import Transaction, Account, Currency, Category, Fact, PlannedPayment, TransactionType
 from playhouse.shortcuts import model_to_dict
 
 FINANCE_INSTRUCTIONS = """
@@ -328,17 +328,125 @@ def delete_planned_payment(payment_id: int) -> dict:
 @agent.tool_plain(requires_approval=True)
 def create_transaction(
         account_id: int,
-        amount: int,
+        amount: float,
         currency_id: int,
-        transaction_type: int,
-        category_id: int,
+        transaction_type: TransactionType,
         description: str,
-        occurred_at: str
-    ) -> None:
+        occurred_at_str: str,
+        category_id: int = None,
+    ) -> dict:
     """
-    Create new transaction
+    Create a new transaction.
     Args:
-        amount: product price 
-        description: product description
+        account_id: account id
+        amount: transaction amount
+        currency_id: currency id
+        transaction_type: transaction type (expense, income, transfer, refund)
+        description: transaction description
+        occurred_at_str: date in ISO format
+        category_id: category id (optional)
     """
-    Transaction.create(amount=amount, description=description)
+    account = Account.get_or_none(Account.id == account_id)
+    if account is None:
+        return {"error": "Account not found"}
+
+    currency = Currency.get_or_none(Currency.id == currency_id)
+    if currency is None:
+        return {"error": "Currency not found"}
+
+    category = None
+    if category_id is not None:
+        category = Category.get_or_none(Category.id == category_id)
+        if category is None:
+            return {"error": "Category not found"}
+
+    try:
+        occurred_at = datetime.fromisoformat(occurred_at_str)
+    except ValueError:
+        return {"error": f"Invalid date: {occurred_at_str!r}"}
+
+    return model_to_dict(
+        Transaction.create(
+            account=account,
+           amount=amount,
+           currency=currency,
+           transaction_type=transaction_type,
+           category=category,
+           description=description,
+           occurred_at=occurred_at)
+        )
+
+@agent.tool_plain(requires_approval=True)
+def update_transaction(
+        transaction_id: int,
+        account_id: int = None,
+        amount: float = None,
+        currency_id: int = None,
+        transaction_type: TransactionType = None,
+        category_id: int = None,
+        description: str = None,
+        occurred_at_str: str = None) -> dict:
+    """
+    Update an existing transaction.
+    Args:
+        transaction_id: transaction id
+        account_id: new account id
+        amount: new amount
+        currency_id: new currency id
+        transaction_type: new transaction type
+        category_id: new category id
+        description: new description
+        occurred_at_str: new date in ISO format
+    """
+    transaction = Transaction.get_or_none(Transaction.id == transaction_id)
+    if not transaction:
+        return {"error": "Transaction not found"}
+
+    if account_id is not None:
+        account = Account.get_or_none(Account.id == account_id)
+        if not account:
+            return {"error": "Account not found"}
+        transaction.account = account
+
+    if amount is not None:
+        transaction.amount = amount
+
+    if currency_id is not None:
+        currency = Currency.get_or_none(Currency.id == currency_id)
+        if not currency:
+            return {"error": "Currency not found"}
+        transaction.currency = currency
+
+    if transaction_type is not None:
+        transaction.transaction_type = transaction_type
+
+    if category_id is not None:
+        category = Category.get_or_none(Category.id == category_id)
+        if not category:
+            return {"error": "Category not found"}
+        transaction.category = category
+
+    if description is not None:
+        transaction.description = description
+
+    if occurred_at_str is not None:
+        try:
+            transaction.occurred_at = datetime.fromisoformat(occurred_at_str)
+        except ValueError:
+            return {"error": f"Invalid date: {occurred_at_str!r}"}
+
+    transaction.save()
+    return model_to_dict(transaction)
+
+@agent.tool_plain(requires_approval=True)
+def delete_transaction(transaction_id: int) -> dict:
+    """
+    Delete a transaction by id.
+    Args:
+        transaction_id: transaction id
+    """
+    transaction = Transaction.get_or_none(Transaction.id == transaction_id)
+    if not transaction:
+        return {"error": "Transaction not found"}
+    transaction.delete_instance()
+    return {"ok": True, "message": "Transaction deleted"}

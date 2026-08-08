@@ -1,3 +1,4 @@
+import enum
 import logging
 import datetime
 from peewee import *
@@ -46,6 +47,12 @@ class PlannedPayment(BaseModel):
     recurrence = CharField(null=True)
     is_active = BooleanField(default=True)
 
+class TransactionType(enum.StrEnum):
+    EXPENSE = "expense"
+    INCOME = "income"
+    TRANSFER = "transfer"
+    REFUND = "refund"
+
 class Transaction(BaseModel):
     account = ForeignKeyField(Account)
     amount = DecimalField(
@@ -54,7 +61,10 @@ class Transaction(BaseModel):
         auto_round=False,
     )
     currency = ForeignKeyField(Currency)
-    transaction_type = CharField()
+    transaction_type = CharField(
+        max_length=16,
+        constraints=[Check("transaction_type IN ('expense', 'income', 'transfer', 'refund')")],
+    )
     category = ForeignKeyField(Category, null=True)
     description = TextField(null=True)
     occurred_at = DateTimeField()
