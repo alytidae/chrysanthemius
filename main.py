@@ -6,6 +6,7 @@ load_dotenv()
 
 from models import init_db
 from telegram import run_telegram_bot
+from agent import get_accounts
 
 logging.basicConfig(
     level=logging.INFO,

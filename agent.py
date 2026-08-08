@@ -1,5 +1,6 @@
 from pydantic_ai import Agent, DeferredToolRequests
-from models import Transaction
+from models import Transaction, Account, Currency, Category, Fact, PlannedPayment
+from playhouse.shortcuts import model_to_dict
 
 FINANCE_INSTRUCTIONS = """
 You are a personal finance assistant.
@@ -15,8 +16,37 @@ agent = Agent(
     output_type=[str, DeferredToolRequests],
 )
 
+@agent.tool_plain()
+def get_accounts() -> list[dict]:
+    return list(Account.select().dicts())
+
 @agent.tool_plain(requires_approval=True)
-def create_transaction(amount: int, description: str) -> bool:
+def create_account(name, description) -> dict:
+    return model_to_dict(
+        Account.create(name, description)
+    )
+    
+@agent.tool_plain()
+def get_currencies() -> list[dict]:
+    return list(Currency.select().dicts())
+
+@agent.tool_plain()
+def get_categories() -> list[dict]:
+    return list(Category.select().dicts())
+
+@agent.tool_plain()
+def get_facts() -> list[dict]:
+    return list(Fact.select().dicts())
+
+@agent.tool_plain()
+def get_planned_payments() -> list[dict]:
+    return list(PlannedPayment.select().dicts())
+
+@agent.tool_plain(requires_approval=True)
+def create_transaction(
+        # account: int,
+        amount: int
+        , description: str) -> None:
     """
     Create new transaction
     Args:
@@ -24,11 +54,3 @@ def create_transaction(amount: int, description: str) -> bool:
         description: product description
     """
     Transaction.create(amount=amount, description=description)
-
-@agent.tool_plain
-def get_stats() -> float:
-    """
-    Get spending statistic
-    """
-    return Transaction.get_all_transaction_sum()
-

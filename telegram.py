@@ -18,15 +18,15 @@ if not token:
 
 bot = telebot.TeleBot(token)
 
-def format_approvals(approvals):
-    products = ""
-
-    for approval in approvals:
-        args = json.loads(approval.args)
-        products += f"- {args['description']} - {args['amount']}\n"
-
-    return products
-
+# def format_approvals(approvals):
+#     products = "hello"
+#
+#     # for approval in approvals:
+#     #     args = json.loads(approval.args)
+#     #     products += f"- {args['description']} - {args['amount']}\n"
+#     #
+    # return products
+    #
 
 @bot.message_handler(content_types=["text"], chat_types=["private"])
 def handle_text(message: telebot.types.Message) -> None:
@@ -57,7 +57,7 @@ def handle_text(message: telebot.types.Message) -> None:
         bot.send_rich_message(
             chat_id=message.chat.id,
             rich_message=telebot.types.InputRichMessage(
-                markdown=format_approvals(result.output.approvals),
+                markdown=str(result.output),
             ),
             reply_parameters=telebot.types.ReplyParameters(
                 message_id=message.message_id,
@@ -79,6 +79,9 @@ def handle_text(message: telebot.types.Message) -> None:
     func=lambda call: call.data.startswith(("approve:", "deny:"))
 )
 def handle_approval(call):
+    if str(call.from_user.id) != os.getenv("ALLOWED_TELEGRAM_USER_ID"):
+        return
+
     action, approval_id = call.data.split(":", maxsplit=1)
 
     try:
@@ -129,7 +132,7 @@ def handle_approval(call):
         reply_markup=None,
     )
     bot.edit_message_text(
-        text=f"{call.message.text}\n\n{status}",
+        text=f"{call.message.rich_message}\n\n{status}",
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
     )

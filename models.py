@@ -63,5 +63,13 @@ class Transaction(BaseModel):
 def init_db():
     db.connect()
     logger.info("Connected to db")
-    db.create_tables([Transaction])
+    db.create_tables([
+        Currency, 
+        Category, 
+        Message, 
+        Fact,
+        Account,
+        PlannedPayment,
+        Transaction, 
+    ])
     logger.info("Updated db tables")
