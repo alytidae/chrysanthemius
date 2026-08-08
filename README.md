@@ -1,3 +1,3 @@
 <p align="center">
-  <img src="coin.png" alt="50 Yen" width="180">
+  <img src="coin.jpg" alt="Coin" width="180">
 </p>
