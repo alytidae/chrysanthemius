@@ -22,16 +22,32 @@ agent = Agent(
 
 @agent.tool_plain()
 def get_accounts() -> list[dict]:
+    """
+    List all accounts.
+    """
     return list(Account.select().dicts())
 
 @agent.tool_plain(requires_approval=True)
 def create_account(name, description) -> dict:
+    """
+    Create a new account.
+    Args:
+        name: account name
+        description: account description
+    """
     return model_to_dict(
         Account.create(name=name, description=description)
     )
 
 @agent.tool_plain(requires_approval=True)
 def update_account(account_id: int, name: str = None, description: str = None) -> dict:
+    """
+    Update an existing account.
+    Args:
+        account_id: account id
+        name: new account name
+        description: new account description
+    """
     account = Account.get_or_none(Account.id == account_id)
     if not account:
         return {"error": "Account not found"}
@@ -44,6 +60,11 @@ def update_account(account_id: int, name: str = None, description: str = None) -
 
 @agent.tool_plain(requires_approval=True)
 def delete_account(account_id: int) -> dict:
+    """
+    Delete an account by id.
+    Args:
+        account_id: account id
+    """
     account = Account.get_or_none(Account.id == account_id)
     if not account:
         return {"error": "Account not found"}
@@ -55,10 +76,18 @@ def delete_account(account_id: int) -> dict:
 
 @agent.tool_plain()
 def get_currencies() -> list[dict]:
+    """
+    List all currencies.
+    """
     return list(Currency.select().dicts())
 
 @agent.tool_plain(requires_approval=True)
 def create_currency(code: str) -> dict:
+    """
+    Create a new currency.
+    Args:
+        code: currency code, e.g. USD, EUR
+    """
     try:
         currency = Currency.create(code=code)
     except IntegrityError:
@@ -67,6 +96,12 @@ def create_currency(code: str) -> dict:
 
 @agent.tool_plain(requires_approval=True)
 def update_currency(currency_id: int, code: str = None) -> dict:
+    """
+    Update an existing currency.
+    Args:
+        currency_id: currency id
+        code: new currency code
+    """
     currency = Currency.get_or_none(Currency.id == currency_id)
     if not currency:
         return {"error": "Currency not found"}
@@ -80,6 +115,11 @@ def update_currency(currency_id: int, code: str = None) -> dict:
 
 @agent.tool_plain(requires_approval=True)
 def delete_currency(currency_id: int) -> dict:
+    """
+    Delete a currency by id.
+    Args:
+        currency_id: currency id
+    """
     currency = Currency.get_or_none(Currency.id == currency_id)
     if not currency:
         return {"error": "Currency not found"}
@@ -94,10 +134,18 @@ def delete_currency(currency_id: int) -> dict:
 
 @agent.tool_plain()
 def get_categories() -> list[dict]:
+    """
+    List all categories.
+    """
     return list(Category.select().dicts())
 
 @agent.tool_plain(requires_approval=True)
 def create_category(name: str) -> dict:
+    """
+    Create a new category.
+    Args:
+        name: category name
+    """
     try:
         category = Category.create(name=name)
     except IntegrityError:
@@ -106,6 +154,12 @@ def create_category(name: str) -> dict:
 
 @agent.tool_plain(requires_approval=True)
 def update_category(category_id: int, name: str = None) -> dict:
+    """
+    Update an existing category.
+    Args:
+        category_id: category id
+        name: new category name
+    """
     category = Category.get_or_none(Category.id == category_id)
     if not category:
         return {"error": "Category not found"}
@@ -119,6 +173,11 @@ def update_category(category_id: int, name: str = None) -> dict:
 
 @agent.tool_plain(requires_approval=True)
 def delete_category(category_id: int) -> dict:
+    """
+    Delete a category by id.
+    Args:
+        category_id: category id
+    """
     category = Category.get_or_none(Category.id == category_id)
     if not category:
         return {"error": "Category not found"}
@@ -130,14 +189,28 @@ def delete_category(category_id: int) -> dict:
 
 @agent.tool_plain()
 def get_facts() -> list[dict]:
+    """
+    List all facts.
+    """
     return list(Fact.select().dicts())
 
 @agent.tool_plain(requires_approval=True)
 def create_fact(content: str) -> dict:
+    """
+    Create a new fact.
+    Args:
+        content: fact text
+    """
     return model_to_dict(Fact.create(content=content))
 
 @agent.tool_plain(requires_approval=True)
 def update_fact(fact_id: int, content: str) -> dict:
+    """
+    Update an existing fact.
+    Args:
+        fact_id: fact id
+        content: new fact text
+    """
     fact = Fact.get_or_none(Fact.id == fact_id)
     if not fact:
         return {"error": "Fact not found"}
@@ -147,6 +220,11 @@ def update_fact(fact_id: int, content: str) -> dict:
 
 @agent.tool_plain(requires_approval=True)
 def delete_fact(fact_id: int) -> dict:
+    """
+    Delete a fact by id.
+    Args:
+        fact_id: fact id
+    """
     fact = Fact.get_or_none(Fact.id == fact_id)
     if not fact:
         return {"error": "Fact not found"}
@@ -155,6 +233,9 @@ def delete_fact(fact_id: int) -> dict:
 
 @agent.tool_plain()
 def get_planned_payments() -> list[dict]:
+    """
+    List all planned payments.
+    """
     return list(PlannedPayment.select().dicts())
 
 @agent.tool_plain(requires_approval=True)
@@ -164,6 +245,15 @@ def create_planned_payment(
         currency_id: int,
         due_at: str = None,
         recurrence: str = None) -> dict:
+    """
+    Create a new planned payment.
+    Args:
+        description: payment description
+        amount: payment amount
+        currency_id: currency id
+        due_at: due date in ISO format (optional)
+        recurrence: recurrence rule, e.g. monthly (optional)
+    """
     currency = Currency.get_or_none(Currency.id == currency_id)
     if not currency:
         return {"error": "Currency not found"}
@@ -190,6 +280,16 @@ def update_planned_payment(
         currency_id: int = None,
         due_at: str = None,
         recurrence: str = None) -> dict:
+    """
+    Update an existing planned payment.
+    Args:
+        payment_id: planned payment id
+        description: new payment description
+        amount: new payment amount
+        currency_id: new currency id
+        due_at: new due date (ISO format)
+        recurrence: new recurrence rule
+    """
     payment = PlannedPayment.get_or_none(PlannedPayment.id == payment_id)
     if not payment:
         return {"error": "Planned payment not found"}
@@ -214,6 +314,11 @@ def update_planned_payment(
 
 @agent.tool_plain(requires_approval=True)
 def delete_planned_payment(payment_id: int) -> dict:
+    """
+    Delete a planned payment by id.
+    Args:
+        payment_id: planned payment id
+    """
     payment = PlannedPayment.get_or_none(PlannedPayment.id == payment_id)
     if not payment:
         return {"error": "Planned payment not found"}
@@ -222,9 +327,14 @@ def delete_planned_payment(payment_id: int) -> dict:
 
 @agent.tool_plain(requires_approval=True)
 def create_transaction(
-        # account: int,
+        account_id: int,
         amount: int,
-        description: str) -> None:
+        currency_id: int,
+        transaction_type: int,
+        category_id: int,
+        description: str,
+        occurred_at: str
+    ) -> None:
     """
     Create new transaction
     Args:
