@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 
 from pydantic_ai import Agent, DeferredToolRequests
 from peewee import IntegrityError
@@ -13,6 +13,26 @@ Determine whether the user wants to record a transaction or receive financial in
 When the user reports an expense, income, transfer, or refund, extract the transaction type, amount, description, and date. If important information is missing, ask one concise clarifying question. Otherwise, use the appropriate tool and confirm the transaction only after it has been saved successfully.
 When the user asks about their finances, retrieve the relevant data using the available tools. Never invent transactions, amounts, balances, or statistics. Explain the results clearly and provide concise, practical recommendations.
 Respond in the user's language. Be calm, supportive, and professional.
+
+Before answering questions about existing accounts, currencies,
+categories or transactions, always use the corresponding read tool
+to inspect the current database state.
+
+Never assume that a previous tool call succeeded based only on
+conversation history.
+
+Never delete or modify existing data unless the user explicitly
+requests that action.
+
+When presenting tabular data, prefer a Markdown code block with aligned plain-text columns instead of Markdown tables.
+
+Example:
+
+```text
+Category   Summ
+Food         50 €
+Transport   20 €
+```
 """
 
 agent = Agent(
@@ -20,6 +40,12 @@ agent = Agent(
     instructions=FINANCE_INSTRUCTIONS,
     output_type=[str, DeferredToolRequests],
 )
+
+
+@agent.instructions
+def add_current_datetime() -> str:
+    now = datetime.now().astimezone()
+    return f"Current date and time: {now.isoformat()}."
 
 @agent.tool_plain()
 def get_accounts() -> list[dict]:
@@ -452,12 +478,26 @@ def delete_transaction(transaction_id: int) -> dict:
     transaction.delete_instance()
     return {"ok": True, "message": "Transaction deleted"}
 
+@agent.tool_plain()
 def get_current_month_transactions() -> dict:
-    month_start = datetime.today().replace(day=1)
-    return list(Transaction.select(Transaction.occured_at >= month_start).dicts())
+    month_start = datetime.today().replace(
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    return list(Transaction.select(Transaction.occurred_at >= month_start).dicts())
 
+@agent.tool_plain()
 def get_current_month_spendings_by_category() -> dict:
-    month_start = datetime.today().replace(day=1)
+    month_start = datetime.today().replace(
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
 
     query = (
         Transaction
@@ -467,7 +507,7 @@ def get_current_month_spendings_by_category() -> dict:
         )
         .join(Category)
         .where(
-            Transaction.occured_at >= month_start
+            Transaction.occurred_at >= month_start
         )
         .group_by(Category.id, Category.name)
     )
@@ -478,3 +518,5 @@ def get_current_month_spendings_by_category() -> dict:
         row["name"]: row["total"]
         for row in rows
     }
+
+    return result

@@ -5,8 +5,17 @@ import os
 from agent import agent
 from pydantic_ai import DeferredToolRequests
 import logging
+from models import Message
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    UserPromptPart,
+    TextPart,
+)
 
 logger = logging.getLogger(__name__)
+
+PREVIOUS_MESSAGES_COUNT = 0
 
 pending_approvals = {}
 token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -28,12 +37,65 @@ bot = telebot.TeleBot(token)
     # return products
     #
 
+@bot.message_handler(commands=["help"])
+def handle_command(message):
+    bot.reply_to(message, 
+    """
+    /get_memory_count - Gives how many previous messages agents remember
+    /clean_memory - Set previous message count to 0
+    """)
+
+@bot.message_handler(commands=["get_memory_count"])
+def get_memory_count(message):
+    bot.reply_to(message, f"Agent remembers {PREVIOUS_MESSAGES_COUNT} previous messages")
+
+@bot.message_handler(commands=["clean_memory"])
+def clean_memory(message):
+    global PREVIOUS_MESSAGES_COUNT
+    PREVIOUS_MESSAGES_COUNT = 0
+    bot.reply_to(message, f"Agent remembers 0 previous messages")
+
 @bot.message_handler(content_types=["text"], chat_types=["private"])
 def handle_text(message: telebot.types.Message) -> None:
+    global PREVIOUS_MESSAGES_COUNT
+
     if str(message.from_user.id) != os.getenv("ALLOWED_TELEGRAM_USER_ID"):
         return
 
-    result = agent.run_sync(message.text)
+    history = []
+    for history_message in (
+        Message
+        .select()
+        .order_by(Message.created_at.desc())
+        .limit(PREVIOUS_MESSAGES_COUNT)[::-1]
+    ):
+        if history_message.role == "user":
+            history.append(
+                ModelRequest(
+                    parts=[UserPromptPart(content=history_message.content)]
+                )
+            )
+
+        elif history_message.role == "assistant":
+            history.append(
+                ModelResponse(
+                    parts=[TextPart(content=history_message.content)]
+                )
+            )
+
+    Message.create(role="user", content=message.text)
+
+    result = agent.run_sync(
+        message.text,
+        message_history=history
+    )
+
+    Message.create(role="assistant", content=result.output)
+
+    PREVIOUS_MESSAGES_COUNT += 2
+    if PREVIOUS_MESSAGES_COUNT > 20:
+        PREVIOUS_MESSAGES_COUNT = 20
+
     if isinstance(result.output, DeferredToolRequests):
         keyboard = telebot.types.InlineKeyboardMarkup()
 
