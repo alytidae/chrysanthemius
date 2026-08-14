@@ -2,6 +2,7 @@ import datetime
 
 from pydantic_ai import Agent, DeferredToolRequests
 from peewee import IntegrityError
+from peewee import fn
 
 from models import Transaction, Account, Currency, Category, Fact, PlannedPayment, TransactionType
 from playhouse.shortcuts import model_to_dict
@@ -450,3 +451,30 @@ def delete_transaction(transaction_id: int) -> dict:
         return {"error": "Transaction not found"}
     transaction.delete_instance()
     return {"ok": True, "message": "Transaction deleted"}
+
+def get_current_month_transactions() -> dict:
+    month_start = datetime.today().replace(day=1)
+    return list(Transaction.select(Transaction.occured_at >= month_start).dicts())
+
+def get_current_month_spendings_by_category() -> dict:
+    month_start = datetime.today().replace(day=1)
+
+    query = (
+        Transaction
+        .select(
+            Category.name,
+            fn.SUM(Transaction.amount).alias("total"),
+        )
+        .join(Category)
+        .where(
+            Transaction.occured_at >= month_start
+        )
+        .group_by(Category.id, Category.name)
+    )
+
+    rows = query.dicts()
+
+    result = {
+        row["name"]: row["total"]
+        for row in rows
+    }
