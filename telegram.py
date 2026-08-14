@@ -3,8 +3,9 @@ import json
 import uuid
 import os
 from agent import agent
-from pydantic_ai import DeferredToolRequests
+from pydantic_ai import DeferredToolRequests, ToolDenied
 import logging
+from formatters import format_deferred_requests
 from models import Message
 from pydantic_ai.messages import (
     ModelRequest,
@@ -26,16 +27,6 @@ if not token:
     )
 
 bot = telebot.TeleBot(token)
-
-# def format_approvals(approvals):
-#     products = "hello"
-#
-#     # for approval in approvals:
-#     #     args = json.loads(approval.args)
-#     #     products += f"- {args['description']} - {args['amount']}\n"
-#     #
-    # return products
-    #
 
 @bot.message_handler(commands=["help"])
 def handle_command(message):
@@ -119,7 +110,7 @@ def handle_text(message: telebot.types.Message) -> None:
         bot.send_rich_message(
             chat_id=message.chat.id,
             rich_message=telebot.types.InputRichMessage(
-                markdown=str(result.output),
+                markdown=format_deferred_requests(result.output),
             ),
             reply_parameters=telebot.types.ReplyParameters(
                 message_id=message.message_id,
@@ -149,41 +140,39 @@ def handle_approval(call):
     try:
         approval = pending_approvals.pop(approval_id)
     except KeyError:
-        return 
-    
+        return
+
+    requests = approval["requests"]
+    messages = approval["messages"]
+
     if action == "approve":
         status = "✅ Approve"
-
-        requests = approval["requests"]
-        messages = approval["messages"]
-
-        decisions = {}
-
-        for tool_call in requests.approvals:
-            decisions[tool_call.tool_call_id] = True
-
-        deferred_results = requests.build_results(
-            approvals=decisions
-        )
-
-        deferred_results = requests.build_results(
-            approvals=decisions
-        )
-
-        final_result = agent.run_sync(
-            message_history=messages,
-            deferred_tool_results=deferred_results,
-        )
-
-        bot.send_rich_message(
-            chat_id=call.message.chat.id,
-            rich_message=telebot.types.InputRichMessage(
-                markdown=str(final_result.output),
-            ),
-        )
+        decisions = {
+            tool_call.tool_call_id: True
+            for tool_call in requests.approvals
+        }
     else:
         status = "❌ Deny"
+        decisions = {
+            tool_call.tool_call_id: ToolDenied()
+            for tool_call in requests.approvals
+        }
 
+    deferred_results = requests.build_results(
+        approvals=decisions
+    )
+
+    final_result = agent.run_sync(
+        message_history=messages,
+        deferred_tool_results=deferred_results,
+    )
+
+    bot.send_rich_message(
+        chat_id=call.message.chat.id,
+        rich_message=telebot.types.InputRichMessage(
+            markdown=str(final_result.output),
+        ),
+    )
     bot.answer_callback_query(
         callback_query_id=call.id,
         text=status,
