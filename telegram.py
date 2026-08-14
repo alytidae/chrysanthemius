@@ -28,6 +28,44 @@ if not token:
 
 bot = telebot.TeleBot(token)
 
+def send_agent_result(chat_id: int, result, reply_parameters=None) -> None:
+    if isinstance(result.output, DeferredToolRequests):
+        callback_id = uuid.uuid4().hex
+
+        pending_approvals[callback_id] = {
+            "requests": result.output,
+            "messages": result.all_messages(),
+            "text": format_deferred_requests(result.output),
+        }
+
+        keyboard = telebot.types.InlineKeyboardMarkup()
+        keyboard.row(
+            telebot.types.InlineKeyboardButton(
+                text="✅ Approve",
+                callback_data=f"approve:{callback_id}",
+            ),
+            telebot.types.InlineKeyboardButton(
+                text="❌ Deny",
+                callback_data=f"deny:{callback_id}",
+            ),
+        )
+        bot.send_rich_message(
+            chat_id=chat_id,
+            rich_message=telebot.types.InputRichMessage(
+                markdown=format_deferred_requests(result.output),
+            ),
+            reply_parameters=reply_parameters,
+            reply_markup=keyboard,
+        )
+    else:
+        bot.send_rich_message(
+            chat_id=chat_id,
+            rich_message=telebot.types.InputRichMessage(
+                markdown=str(result.output),
+            ),
+            reply_parameters=reply_parameters,
+        )
+
 @bot.message_handler(commands=["help"])
 def handle_command(message):
     bot.reply_to(message, 
@@ -87,46 +125,13 @@ def handle_text(message: telebot.types.Message) -> None:
     if PREVIOUS_MESSAGES_COUNT > 20:
         PREVIOUS_MESSAGES_COUNT = 20
 
-    if isinstance(result.output, DeferredToolRequests):
-        keyboard = telebot.types.InlineKeyboardMarkup()
-
-        callback_id = uuid.uuid4().hex
-
-        pending_approvals[callback_id] = {
-            "requests": result.output,
-            "messages": result.all_messages(),
-        }
-        
-        keyboard.row(
-            telebot.types.InlineKeyboardButton(
-                text="✅ Approve",
-                callback_data=f"approve:{callback_id}",
-            ),
-            telebot.types.InlineKeyboardButton(
-                text="❌ Deny",
-                callback_data=f"deny:{callback_id}",
-            ),
-        )
-        bot.send_rich_message(
-            chat_id=message.chat.id,
-            rich_message=telebot.types.InputRichMessage(
-                markdown=format_deferred_requests(result.output),
-            ),
-            reply_parameters=telebot.types.ReplyParameters(
-                message_id=message.message_id,
-            ),
-            reply_markup=keyboard,
-        )
-    else:
-        bot.send_rich_message(
-            chat_id=message.chat.id,
-            rich_message=telebot.types.InputRichMessage(
-                markdown=str(result.output),
-            ),
-            reply_parameters=telebot.types.ReplyParameters(
-                message_id=message.message_id,
-            ),
-        )
+    send_agent_result(
+        chat_id=message.chat.id,
+        result=result,
+        reply_parameters=telebot.types.ReplyParameters(
+            message_id=message.message_id,
+        ),
+    )
 
 @bot.callback_query_handler(
     func=lambda call: call.data.startswith(("approve:", "deny:"))
@@ -167,11 +172,9 @@ def handle_approval(call):
         deferred_tool_results=deferred_results,
     )
 
-    bot.send_rich_message(
+    send_agent_result(
         chat_id=call.message.chat.id,
-        rich_message=telebot.types.InputRichMessage(
-            markdown=str(final_result.output),
-        ),
+        result=final_result,
     )
     bot.answer_callback_query(
         callback_query_id=call.id,
@@ -183,7 +186,7 @@ def handle_approval(call):
         reply_markup=None,
     )
     bot.edit_message_text(
-        text=f"{call.message.rich_message}\n\n{status}",
+        text=f"{approval['text']}\n\n{status}",
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
     )
